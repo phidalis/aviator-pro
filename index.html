@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Aviator Pro | Crash Game</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700;14..32,800;14..32,900&display=swap" rel="stylesheet">
+    <!-- Firebase SDK -->
+<script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+    import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+    
+    // Your Firebase config from console
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_AUTH_DOMAIN",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_STORAGE_BUCKET",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+    
+    window.firebaseApp = initializeApp(firebaseConfig);
+    window.firebaseAuth = getAuth(window.firebaseApp);
+    window.firebaseDB = getFirestore(window.firebaseApp);
+</script>
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- TOP NAVIGATION BAR -->
+        <nav class="top-nav">
+            <div class="nav-left">
+                <div class="logo">
+                    <span class="logo-icon">✈️</span>
+                    <span class="logo-text">AVIATOR<span class="pro-badge">PRO</span></span>
+                </div>
+            </div>
+            <div class="nav-center">
+                <div class="balance-display">
+                    <span class="balance-label">BALANCE</span>
+                    <span class="balance-value" id="mainBalance">5,000.00</span>
+                    <span class="balance-currency">KSH</span>
+                </div>
+            </div>
+            <div class="nav-right">
+                <div class="user-info" id="userInfo">
+                    <span class="username-display" id="usernameDisplay">👤 GUEST</span>
+                </div>
+                <button class="nav-btn login-btn" id="loginBtn">LOGIN</button>
+                <button class="nav-btn signup-btn" id="signupBtn">SIGN UP</button>
+                <button class="nav-btn logout-btn" id="logoutBtn" style="display: none;">LOGOUT</button>
+                <button class="chat-toggle-btn" id="chatToggleBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <span>CHAT</span>
+                </button>
+            </div>
+        </nav>
+
+        <div class="main-layout">
+            <!-- LEFT SIDEBAR: LIVE BETS + HISTORY -->
+            <aside class="bets-sidebar">
+                <div class="sidebar-header">
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="all">ALL BETS</button>
+                        <button class="tab-btn" data-tab="my">MY BETS</button>
+                    </div>
+                </div>
+                <div class="bets-table-header">
+                    <span>Player</span><span>Bet</span><span>Multiplier</span><span>Cashout</span>
+                </div>
+                <div class="bets-list" id="liveBetsList">
+                    <div class="bet-row placeholder-row">Live bets appear here</div>
+                </div>
+                <div class="history-strip-container">
+                    <div class="history-label">RECENT CRASHES</div>
+                    <div class="history-strip" id="historyStrip"></div>
+                </div>
+            </aside>
+
+            <!-- CENTER: GAME ENGINE -->
+            <main class="game-engine">
+                <div class="canvas-wrapper">
+                    <div id="mainMultiplier">1.00x</div>
+                    <canvas id="flightCanvas"></canvas>
+                    
+                    <!-- FLY AWAY OVERLAY (CRASH) -->
+                    <div id="flewAwayOverlay" class="overlay hidden">
+                        <div class="crash-animation">
+                            <span class="flew-text">💥 FLEW AWAY!</span>
+                            <span class="final-mult" id="finalMult">1.00x</span>
+                        </div>
+                    </div>
+                    
+                    <!-- WAITING OVERLAY (BETWEEN ROUNDS) -->
+                    <div id="waitingOverlay" class="overlay">
+                        <div class="wait-content">
+                            <div class="wait-spinner"></div>
+                            <p>NEXT ROUND STARTS IN</p>
+                            <div class="progress-container">
+                                <div class="progress-bar" id="waitProgress"></div>
+                            </div>
+                            <span class="wait-seconds" id="waitSeconds">5</span>
+                        </div>
+                    </div>
+
+                    <!-- AUTO CASHOUT INDICATOR -->
+                    <div class="auto-cashout-badge" id="autoCashoutBadge" style="display: none;">AUTO ⚡</div>
+                </div>
+
+                <!-- BETTING ZONE: TWO SLOTS -->
+                <div class="betting-zone">
+                    <div class="bet-card" data-slot="1">
+                        <div class="bet-input-area">
+                            <div class="input-group">
+                                <input type="number" id="bet1Amount" class="bet-amount-input" value="100" step="10" min="10">
+                                <div class="quick-btns">
+                                    <button class="quick-add" data-slot="1" data-add="100">+100</button>
+                                    <button class="quick-add" data-slot="1" data-add="500">+500</button>
+                                    <button class="quick-add" data-slot="1" data-add="1000">+1k</button>
+                                </div>
+                            </div>
+                            <div class="auto-options">
+                                <label class="auto-label">
+                                    <input type="checkbox" class="auto-cash-chk" data-slot="1"> AUTO @ <span class="auto-mult-val">1.5x</span>
+                                </label>
+                                <input type="range" class="auto-slider" data-slot="1" min="1.2" max="10" step="0.1" value="1.5">
+                            </div>
+                        </div>
+                        <button class="action-btn bet-btn" data-slot="1">PLACE BET</button>
+                    </div>
+
+                    <div class="bet-card" data-slot="2">
+                        <div class="bet-input-area">
+                            <div class="input-group">
+                                <input type="number" id="bet2Amount" class="bet-amount-input" value="100" step="10" min="10">
+                                <div class="quick-btns">
+                                    <button class="quick-add" data-slot="2" data-add="100">+100</button>
+                                    <button class="quick-add" data-slot="2" data-add="500">+500</button>
+                                    <button class="quick-add" data-slot="2" data-add="1000">+1k</button>
+                                </div>
+                            </div>
+                            <div class="auto-options">
+                                <label class="auto-label">
+                                    <input type="checkbox" class="auto-cash-chk" data-slot="2"> AUTO @ <span class="auto-mult-val">1.5x</span>
+                                </label>
+                                <input type="range" class="auto-slider" data-slot="2" min="1.2" max="10" step="0.1" value="1.5">
+                            </div>
+                        </div>
+                        <button class="action-btn bet-btn" data-slot="2">PLACE BET</button>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- FIXED FOOTER: WALLET & ACTIONS -->
+        <footer class="fixed-footer">
+            <div class="footer-wallet">
+                <div class="wallet-info">
+                    <span class="wallet-icon">💼</span>
+                    <span class="wallet-label">WALLET</span>
+                    <span class="wallet-amount" id="footerBalance">₿ 5,000.00</span>
+                </div>
+                <div class="wallet-actions">
+                    <button class="footer-btn deposit-btn" id="depositBtn">➕ DEPOSIT</button>
+                    <button class="footer-btn withdraw-btn" id="withdrawBtn">💸 WITHDRAW</button>
+                    <button class="footer-btn history-btn" id="txHistoryBtn">📜 HISTORY</button>
+                </div>
+            </div>
+            <div class="footer-copyright">
+                <span>🎰 AVIATOR PRO • PROVABLY FAIR • RNG CERTIFIED</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- CHAT SIDEPANEL -->
+    <div class="chat-panel" id="chatPanel">
+        <div class="chat-header">
+            <span>💬 LIVE CHAT</span>
+            <button id="closeChatBtn">✕</button>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="chat-msg system">Welcome to Aviator Pro! Chat with players.</div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="chatInput" placeholder="Type a message...">
+            <button id="sendChatBtn">SEND</button>
+        </div>
+    </div>
+
+    <!-- MODAL: LOGIN -->
+    <div class="modal-overlay" id="loginModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <span>🔐 LOGIN</span>
+                <button class="modal-close" data-modal="loginModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="loginUsername" class="modal-input" placeholder="Username" autocomplete="off">
+                <input type="password" id="loginPassword" class="modal-input" placeholder="Password" autocomplete="off">
+                <button class="modal-submit" id="submitLogin">LOGIN</button>
+                <p class="modal-note">Demo: any username/password works</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: SIGNUP -->
+    <div class="modal-overlay" id="signupModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <span>📝 SIGN UP</span>
+                <button class="modal-close" data-modal="signupModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="signupUsername" class="modal-input" placeholder="Username" autocomplete="off">
+                <input type="password" id="signupPassword" class="modal-input" placeholder="Password" autocomplete="off">
+                <input type="tel" id="signupPhone" class="modal-input" placeholder="Phone Number (e.g., 0712345678)" autocomplete="off">
+                <button class="modal-submit" id="submitSignup">CREATE ACCOUNT</button>
+                <p class="modal-note">Create a player account to deposit/withdraw (10-digit Kenyan number recommended)</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DEPOSIT -->
+    <div class="modal-overlay" id="depositModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <span>💰 DEPOSIT FUNDS</span>
+                <button class="modal-close" data-modal="depositModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="number" id="depositAmount" class="modal-input" placeholder="Amount (KSH)" min="100" step="100" value="1000">
+                <div class="preset-btns">
+                    <button class="preset-amount" data-amount="500">+500</button>
+                    <button class="preset-amount" data-amount="1000">+1,000</button>
+                    <button class="preset-amount" data-amount="5000">+5,000</button>
+                    <button class="preset-amount" data-amount="10000">+10,000</button>
+                </div>
+                <button class="modal-submit" id="submitDeposit">CONFIRM DEPOSIT</button>
+                <p class="modal-note">💰 Instant top-up (demo mode) - API ready for integration</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: WITHDRAW -->
+    <div class="modal-overlay" id="withdrawModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <span>💸 WITHDRAW FUNDS</span>
+                <button class="modal-close" data-modal="withdrawModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="number" id="withdrawAmount" class="modal-input" placeholder="Amount (KSH)" min="100" step="100">
+                <button class="modal-submit" id="submitWithdraw">CONFIRM WITHDRAW</button>
+                <p class="modal-note">Available balance: <span id="withdrawBalance">5,000.00</span> KSH</p>
+                <p class="modal-note">💳 API ready for payment gateway integration</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: TRANSACTION HISTORY -->
+    <div class="modal-overlay" id="historyModal">
+        <div class="modal-container history-modal">
+            <div class="modal-header">
+                <span>📜 TRANSACTION HISTORY</span>
+                <button class="modal-close" data-modal="historyModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="history-list" id="transactionHistoryList">
+                    <div class="history-empty">No transactions yet</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
